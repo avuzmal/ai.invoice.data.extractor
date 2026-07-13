@@ -1,0 +1,385 @@
+{
+  "name": "AI Invoice Data Extractor - Phase 01",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "format": "resolved",
+        "downloadAttachments": true,
+        "filters": {
+          "readStatus": "unread",
+          "q": "has:attachment filename:pdf"
+        },
+        "simple": false,
+        "options": {
+          "markAsRead": true
+        }
+      },
+      "id": "gmail-trigger-id",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const binaryKeys = Object.keys(item.binary || {});\nconst pdfKey = binaryKeys.find(k => item.binary[k].mimeType && item.binary[k].mimeType.includes('application/pdf'));\n\nif (pdfKey) {\n  item.json.has_pdf = true;\n  item.json.pdf_filename = item.binary[pdfKey].fileName;\n  item.json.pdf_mime_type = item.binary[pdfKey].mimeType;\n  let email = null;\n  if (item.json.from) {\n    if (typeof item.json.from === 'string') {\n      const match = item.json.from.match(/<([^>]+)>/);\n      email = match ? match[1] : item.json.from;\n    } else if (item.json.from.value && item.json.from.value[0]) {\n      email = item.json.from.value[0].address;\n    } else if (item.json.from.text) {\n      const match = item.json.from.text.match(/<([^>]+)>/);\n      email = match ? match[1] : item.json.from.text;\n    }\n  }\n  item.json.sender_email = email || 'unknown@example.com';\n  item.binary = {\n    invoice_pdf: item.binary[pdfKey]\n  };\n} else {\n  item.json.has_pdf = false;\n  item.binary = {};\n}\nreturn item;"
+      },
+      "id": "select-pdf-attachment-id",
+      "name": "Select PDF Attachment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.has_pdf }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "filter-pdf-emails-id",
+      "name": "Filter PDF Emails",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [
+        400,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "invoice_pdf"
+      },
+      "id": "extract-pdf-text-id",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        600,
+        140
+      ],
+      "settings": {
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "if (item.json.error || !item.json.text) {\n  item.json.extraction_failed = true;\n  item.json.extraction_warning = null;\n  item.json.invoice_text = '';\n} else {\n  item.json.extraction_failed = false;\n  item.json.invoice_text = item.json.text;\n  if (item.json.text.length < 50) {\n    item.json.extraction_warning = 'Extraction returned < 50 characters: ' + item.json.text.length;\n    console.warn(item.json.extraction_warning);\n  } else {\n    item.json.extraction_warning = null;\n  }\n}\nreturn item;"
+      },
+      "id": "validate-prep-extraction-id",
+      "name": "Validate & Prep Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.extraction_failed }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "if-extraction-success-id",
+      "name": "IF Extraction Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const invoiceText = item.json.invoice_text || '';\nconst systemPrompt = `You are a specialized invoice data extraction engine. Extract structured data from invoice documents and return ONLY valid JSON with no markdown formatting, no explanations, no preamble.\\n\\nReturn this exact JSON structure with all fields present:\\n\\n{\\n  \"invoice_number\": {\"value\": null, \"confidence\": 0},\\n  \"invoice_date\": {\"value\": null, \"confidence\": 0},\\n  \"due_date\": {\"value\": null, \"confidence\": 0},\\n  \"vendor\": {\\n    \"name\": {\"value\": null, \"confidence\": 0},\\n    \"address\": {\"value\": null, \"confidence\": 0},\\n    \"email\": {\"value\": null, \"confidence\": 0}\\n  },\\n  \"client\": {\\n    \"name\": {\"value\": null, \"confidence\": 0}\\n  },\\n  \"line_items\": [\\n    {\\n      \"description\": {\"value\": null, \"confidence\": 0},\\n      \"quantity\": {\"value\": null, \"confidence\": 0},\\n      \"unit_price\": {\"value\": null, \"confidence\": 0},\\n      \"line_total\": {\"value\": null, \"confidence\": 0}\\n    }\\n  ],\\n  \"currency\": {\"value\": null, \"confidence\": 0},\\n  \"subtotal\": {\"value\": null, \"confidence\": 0},\\n  \"tax_amount\": {\"value\": null, \"confidence\": 0},\\n  \"total\": {\"value\": null, \"confidence\": 0},\\n  \"payment_terms\": {\"value\": null, \"confidence\": 0}\\n}\\n\\nRules:\\n1. All dates must be YYYY-MM-DD format\\n2. All monetary values must be numeric only (no $, no commas)\\n3. If a field is not present, use {\"value\": null, \"confidence\": 100}\\n4. line_items must be an array (even if single item)\\n\\nExtract from this invoice text:\\n${invoiceText}`;\n\nitem.json.claude_payload = {\n  model: 'claude-opus-4-5',\n  max_tokens: 2000,\n  messages: [\n    {\n      role: 'user',\n      content: [\n        {\n          type: 'text',\n          text: systemPrompt\n        }\n      ]\n    }\n  ]\n};\nreturn item;"
+      },
+      "id": "prepare-claude-payload-id",
+      "name": "Prepare Claude Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{$credentials.claudeApiKey}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claude_payload) }}",
+        "options": {
+          "retryOnFail": true,
+          "retryAttempts": 1,
+          "retryInterval": 5000
+        }
+      },
+      "id": "claude-api-call-id",
+      "name": "Claude API Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1400,
+        40
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "claude-api-key-credential-id",
+          "name": "Claude API Key"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let extracted = {\n  invoice_number: null,\n  invoice_date: null,\n  due_date: null,\n  vendor_name: null,\n  vendor_address: null,\n  vendor_email: null,\n  client_name: null,\n  subtotal: null,\n  tax_amount: null,\n  total: null,\n  currency: null,\n  raw_response: null\n};\n\nif (item.json.error || !item.json.content || !item.json.content[0] || !item.json.content[0].text) {\n  extracted.raw_response = item.json.error ? JSON.stringify(item.json.error) : 'API_FAILED_OR_INVALID_RESPONSE';\n  item.json.extracted_data = extracted;\n  item.json.success = false;\n  return item;\n}\n\nconst rawText = item.json.content[0].text;\nextracted.raw_response = rawText;\n\ntry {\n  let jsonStr = rawText.trim();\n  if (jsonStr.includes('```json')) {\n    jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();\n  } else if (jsonStr.includes('```')) {\n    jsonStr = jsonStr.split('```')[1].split('```')[0].trim();\n  }\n\n  const data = JSON.parse(jsonStr);\n\n  extracted.invoice_number = data.invoice_number?.value ?? null;\n  extracted.invoice_date = data.invoice_date?.value ?? null;\n  extracted.due_date = data.due_date?.value ?? null;\n  extracted.vendor_name = data.vendor?.name?.value ?? null;\n  extracted.vendor_address = data.vendor?.address?.value ?? null;\n  extracted.vendor_email = data.vendor?.email?.value ?? null;\n  extracted.client_name = data.client?.name?.value ?? null;\n  extracted.subtotal = data.subtotal?.value ?? null;\n  extracted.tax_amount = data.tax_amount?.value ?? null;\n  extracted.total = data.total?.value ?? null;\n  extracted.currency = data.currency?.value ?? null;\n  \n  item.json.extracted_data = extracted;\n  item.json.success = true;\n} catch (err) {\n  console.error('Failed to parse Claude response JSON', err);\n  extracted.raw_response = 'PARSE_FAILED: ' + rawText;\n  item.json.extracted_data = extracted;\n  item.json.success = false;\n}\nreturn item;"
+      },
+      "id": "parse-claude-response-id",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "item.json.extracted_data = {\n  invoice_number: null,\n  invoice_date: null,\n  due_date: null,\n  vendor_name: null,\n  vendor_address: null,\n  vendor_email: null,\n  client_name: null,\n  subtotal: null,\n  tax_amount: null,\n  total: null,\n  currency: null,\n  raw_response: 'EXTRACTION_FAILED'\n};\nitem.json.success = false;\nreturn item;"
+      },
+      "id": "prepare-failed-extraction-row-id",
+      "name": "Prepare Failed Extraction Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendRow",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID_HERE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Source Email": "={{ $('Select PDF Attachment').item.json.sender_email || 'unknown@example.com' }}",
+            "Attachment Filename": "={{ $('Select PDF Attachment').item.json.pdf_filename || 'N/A' }}",
+            "Invoice Number": "={{ $json.extracted_data?.invoice_number }}",
+            "Invoice Date": "={{ $json.extracted_data?.invoice_date }}",
+            "Due Date": "={{ $json.extracted_data?.due_date }}",
+            "Vendor Name": "={{ $json.extracted_data?.vendor_name }}",
+            "Vendor Address": "={{ $json.extracted_data?.vendor_address }}",
+            "Vendor Email": "={{ $json.extracted_data?.vendor_email }}",
+            "Client Name": "={{ $json.extracted_data?.client_name }}",
+            "Subtotal": "={{ $json.extracted_data?.subtotal }}",
+            "Tax Amount": "={{ $json.extracted_data?.tax_amount }}",
+            "Total": "={{ $json.extracted_data?.total }}",
+            "Currency": "={{ $json.extracted_data?.currency }}",
+            "Raw Response": "={{ $json.extracted_data?.raw_response }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "google-sheets-append-id",
+      "name": "Google Sheets Append",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1850,
+        170
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth2-credential-id",
+          "name": "Google Sheets"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Select PDF Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select PDF Attachment": {
+      "main": [
+        [
+          {
+            "node": "Filter PDF Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter PDF Emails": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prep Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Prep Extraction": {
+      "main": [
+        [
+          {
+            "node": "IF Extraction Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Extraction Success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Claude Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Failed Extraction Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Claude Payload": {
+      "main": [
+        [
+          {
+            "node": "Claude API Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude API Call": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Failed Extraction Row": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionTimeout": 60
+  }
+}
