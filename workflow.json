@@ -1,5 +1,5 @@
 {
-  "name": "AI Invoice Data Extractor - Phase 02",
+  "name": "AI Invoice Data Extractor - Phase 03",
   "nodes": [
     {
       "parameters": {
@@ -117,20 +117,6 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "item.json.path = 'text';\nitem.json.invoice_text = item.json.text || '';\nreturn item;"
-      },
-      "id": "set-text-path-meta-id",
-      "name": "Set Text Path Meta",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1000,
-        20
-      ]
-    },
-    {
-      "parameters": {
         "operation": "convertToImage",
         "binaryPropertyName": "attachment",
         "options": {
@@ -164,14 +150,14 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const systemPrompt = `You are a specialized invoice data extraction engine. You will receive either raw text or an image of an invoice. Extract structured data and return ONLY valid JSON with no markdown formatting, no explanations, no preamble.\n\nReturn this exact JSON structure with all fields present:\n\n{\n  \"invoice_number\": {\"value\": null, \"confidence\": 0},\n  \"invoice_date\": {\"value\": null, \"confidence\": 0},\n  \"due_date\": {\"value\": null, \"confidence\": 0},\n  \"vendor\": {\n    \"name\": {\"value\": null, \"confidence\": 0},\n    \"address\": {\"value\": null, \"confidence\": 0},\n    \"email\": {\"value\": null, \"confidence\": 0}\n  },\n  \"client\": {\n    \"name\": {\"value\": null, \"confidence\": 0}\n  },\n  \"line_items\": [\n    {\n      \"description\": {\"value\": null, \"confidence\": 0},\n      \"quantity\": {\"value\": null, \"confidence\": 0},\n      \"unit_price\": {\"value\": null, \"confidence\": 0},\n      \"line_total\": {\"value\": null, \"confidence\": 0}\n    }\n  ],\n  \"currency\": {\"value\": null, \"confidence\": 0},\n  \"subtotal\": {\"value\": null, \"confidence\": 0},\n  \"tax_amount\": {\"value\": null, \"confidence\": 0},\n  \"total\": {\"value\": null, \"confidence\": 0},\n  \"payment_terms\": {\"value\": null, \"confidence\": 0}\n}\n\nRules:\n1. All dates must be YYYY-MM-DD format\n2. All monetary values must be numeric only (no $, no commas)\n3. If a field is not present, use {\"value\": null, \"confidence\": 100}\n4. line_items must be an array (even if single item)\n\nAdditional Rule for Images: If reading from an image, infer missing context visually (e.g., logos for vendor name, layout for line items). If a field is completely illegible, use {\"value\": null, \"confidence\": 0}.`;\n\nconst path = item.json.path || 'text';\nlet content = [];\n\nif (path === 'text') {\n  const extractedText = item.json.invoice_text || '';\n  content = [\n    {\n      type: \"text\",\n      text: `${systemPrompt}\\n\\nINVOICE TEXT:\\n${extractedText}`\n    }\n  ];\n} else if (path === 'vision') {\n  const base64String = item.json.base64String || '';\n  const mimeType = item.json.mimeType || 'image/jpeg';\n  content = [\n    {\n      type: \"text\",\n      text: systemPrompt\n    },\n    {\n      type: \"image\",\n      source: {\n        type: \"base64\",\n        media_type: mimeType,\n        data: base64String\n      }\n    }\n  ];\n}\n\nitem.json.claude_payload = {\n  model: 'claude-3-5-sonnet-20241022',\n  max_tokens: 2000,\n  messages: [\n    {\n      role: 'user',\n      content: content\n    }\n  ]\n};\nreturn item;"
+        "jsCode": "const systemPrompt = `You are a specialized invoice data extraction engine. You will receive either raw text or an image of an invoice. Extract structured data and return ONLY valid JSON with no markdown formatting, no explanations, no preamble.\n\nReturn this exact JSON structure with all fields present:\n\n{\n  \"invoice_number\": {\"value\": null, \"confidence\": 0},\n  \"invoice_date\": {\"value\": null, \"confidence\": 0},\n  \"due_date\": {\"value\": null, \"confidence\": 0},\n  \"vendor\": {\n    \"name\": {\"value\": null, \"confidence\": 0},\n    \"address\": {\"value\": null, \"confidence\": 0},\n    \"email\": {\"value\": null, \"confidence\": 0}\n  },\n  \"client\": {\n    \"name\": {\"value\": null, \"confidence\": 0}\n  },\n  \"line_items\": [\n    {\n      \"description\": {\"value\": null, \"confidence\": 0},\n      \"quantity\": {\"value\": null, \"confidence\": 0},\n      \"unit_price\": {\"value\": null, \"confidence\": 0},\n      \"line_total\": {\"value\": null, \"confidence\": 0}\n    }\n  ],\n  \"currency\": {\"value\": null, \"confidence\": 0},\n  \"subtotal\": {\"value\": null, \"confidence\": 0},\n  \"tax_amount\": {\"value\": null, \"confidence\": 0},\n  \"total\": {\"value\": null, \"confidence\": 0},\n  \"payment_terms\": {\"value\": null, \"confidence\": 0}\n}\n\nRules:\n1. All dates must be YYYY-MM-DD format\n2. All monetary values must be numeric only (no $, no commas)\n3. If a field is not present, use {\"value\": null, \"confidence\": 100}\n4. line_items must be an array (even if single item)\n\nAdditional Rule for Images: If reading from an image, infer missing context visually (e.g., logos for vendor name, layout for line items). If a field is completely illegible, use {\"value\": null, \"confidence\": 0}.`;\n\nconst path = item.json.path || 'text';\nlet content = [];\n\nif (path === 'text') {\n  const extractedText = item.json.text || '';\n  content = [\n    {\n      type: \"text\",\n      text: `${systemPrompt}\\n\\nINVOICE TEXT:\\n${extractedText}`\n    }\n  ];\n} else if (path === 'vision') {\n  const base64String = item.json.base64String || '';\n  const mimeType = item.json.mimeType || 'image/jpeg';\n  content = [\n    {\n      type: \"text\",\n      text: systemPrompt\n    },\n    {\n      type: \"image\",\n      source: {\n        type: \"base64\",\n        media_type: mimeType,\n        data: base64String\n      }\n    }\n  ];\n}\n\nitem.json.claude_payload = {\n  model: 'claude-3-5-sonnet-20241022',\n  max_tokens: 2000,\n  messages: [\n    {\n      role: 'user',\n      content: content\n    }\n  ]\n};\nreturn item;"
       },
       "id": "prepare-claude-multimodal-payload-id",
       "name": "Prepare Claude Multimodal Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1450,
+        1400,
         100
       ]
     },
@@ -212,7 +198,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1650,
+        1600,
         100
       ],
       "credentials": {
@@ -228,29 +214,71 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "let extracted = {\n  invoice_number: null,\n  invoice_date: null,\n  due_date: null,\n  vendor_name: null,\n  vendor_address: null,\n  vendor_email: null,\n  client_name: null,\n  subtotal: null,\n  tax_amount: null,\n  total: null,\n  currency: null,\n  raw_response: null\n};\n\nif (item.json.error || !item.json.content || !item.json.content[0] || !item.json.content[0].text) {\n  extracted.raw_response = item.json.error ? JSON.stringify(item.json.error) : 'API_FAILED_OR_INVALID_RESPONSE';\n  item.json.extracted_data = extracted;\n  item.json.success = false;\n  return item;\n}\n\nconst rawText = item.json.content[0].text;\nextracted.raw_response = rawText;\n\ntry {\n  let jsonStr = rawText.trim();\n  if (jsonStr.includes('```json')) {\n    jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();\n  } else if (jsonStr.includes('```')) {\n    jsonStr = jsonStr.split('```')[1].split('```')[0].trim();\n  }\n\n  const data = JSON.parse(jsonStr);\n\n  extracted.invoice_number = data.invoice_number?.value ?? null;\n  extracted.invoice_date = data.invoice_date?.value ?? null;\n  extracted.due_date = data.due_date?.value ?? null;\n  extracted.vendor_name = data.vendor?.name?.value ?? null;\n  extracted.vendor_address = data.vendor?.address?.value ?? null;\n  extracted.vendor_email = data.vendor?.email?.value ?? null;\n  extracted.client_name = data.client?.name?.value ?? null;\n  extracted.subtotal = data.subtotal?.value ?? null;\n  extracted.tax_amount = data.tax_amount?.value ?? null;\n  extracted.total = data.total?.value ?? null;\n  extracted.currency = data.currency?.value ?? null;\n  \n  item.json.extracted_data = extracted;\n  item.json.success = true;\n} catch (err) {\n  console.error('Failed to parse Claude response JSON', err);\n  extracted.raw_response = 'PARSE_FAILED: ' + rawText;\n  item.json.extracted_data = extracted;\n  item.json.success = false;\n}\nreturn item;"
+        "jsCode": "let extracted = {\n  invoice_number: null,\n  invoice_date: null,\n  due_date: null,\n  vendor_name: null,\n  vendor_address: null,\n  vendor_email: null,\n  client_name: null,\n  subtotal: null,\n  tax_amount: null,\n  total: null,\n  currency: null,\n  raw_response: null\n};\n\nif (item.json.error || !item.json.content || !item.json.content[0] || !item.json.content[0].text) {\n  extracted.raw_response = item.json.error ? JSON.stringify(item.json.error) : 'API_FAILED_OR_INVALID_RESPONSE';\n  item.json.extracted_data = extracted;\n  item.json.extracted_json = null;\n  item.json.success = false;\n  return item;\n}\n\nconst rawText = item.json.content[0].text;\nextracted.raw_response = rawText;\n\ntry {\n  let jsonStr = rawText.trim();\n  if (jsonStr.includes('```json')) {\n    jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();\n  } else if (jsonStr.includes('```')) {\n    jsonStr = jsonStr.split('```')[1].split('```')[0].trim();\n  }\n\n  const data = JSON.parse(jsonStr);\n\n  extracted.invoice_number = data.invoice_number?.value ?? null;\n  extracted.invoice_date = data.invoice_date?.value ?? null;\n  extracted.due_date = data.due_date?.value ?? null;\n  extracted.vendor_name = data.vendor?.name?.value ?? null;\n  extracted.vendor_address = data.vendor?.address?.value ?? null;\n  extracted.vendor_email = data.vendor?.email?.value ?? null;\n  extracted.client_name = data.client?.name?.value ?? null;\n  extracted.subtotal = data.subtotal?.value ?? null;\n  extracted.tax_amount = data.tax_amount?.value ?? null;\n  extracted.total = data.total?.value ?? null;\n  extracted.currency = data.currency?.value ?? null;\n  \n  item.json.extracted_data = extracted;\n  item.json.extracted_json = data;\n  item.json.success = true;\n} catch (err) {\n  console.error('Failed to parse Claude response JSON', err);\n  extracted.raw_response = 'PARSE_FAILED: ' + rawText;\n  item.json.extracted_data = extracted;\n  item.json.extracted_json = null;\n  item.json.success = false;\n}\nreturn item;"
       },
       "id": "parse-claude-response-id",
       "name": "Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1850,
+        1800,
         100
       ]
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "item.json.extracted_data = {\n  invoice_number: null,\n  invoice_date: null,\n  due_date: null,\n  vendor_name: null,\n  vendor_address: null,\n  vendor_email: null,\n  client_name: null,\n  subtotal: null,\n  tax_amount: null,\n  total: null,\n  currency: null,\n  raw_response: item.json.fileType === 'unknown' ? 'UNSUPPORTED_FILE_TYPE' : 'EXTRACTION_FAILED'\n};\nitem.json.success = false;\nreturn item;"
+        "jsCode": "const item = $input.item;\nitem.json.mathDiscrepancies = [];\nitem.json.flags = item.json.flags || [];\n\nif (item.json.success && item.json.extracted_json) {\n  const data = item.json.extracted_json;\n\n  // Check 1: Line Items Sum vs Subtotal\n  if (data.line_items && Array.isArray(data.line_items) && data.subtotal && data.subtotal.value !== null) {\n    let lineItemsSum = 0;\n    let hasLineItems = false;\n    for (const line of data.line_items) {\n      if (line.line_total && line.line_total.value !== null) {\n        const val = parseFloat(line.line_total.value);\n        if (!isNaN(val)) {\n          lineItemsSum += val;\n          hasLineItems = true;\n        }\n      }\n    }\n    \n    if (hasLineItems) {\n      const subtotalVal = parseFloat(data.subtotal.value);\n      if (!isNaN(subtotalVal)) {\n        const diff = Math.abs(lineItemsSum - subtotalVal);\n        if (diff > 0.02) {\n          item.json.mathDiscrepancies.push(`Line items sum (${lineItemsSum.toFixed(2)}) ≠ subtotal (${subtotalVal.toFixed(2)})`);\n          item.json.flags.push(\"LINE_ITEM_SUM_MISMATCH\");\n        }\n      }\n    }\n  }\n\n  // Check 2: Grand Total Match\n  if (data.subtotal && data.subtotal.value !== null && data.total && data.total.value !== null) {\n    const subtotal = parseFloat(data.subtotal.value);\n    const total = parseFloat(data.total.value);\n    const tax = data.tax_amount && data.tax_amount.value !== null ? parseFloat(data.tax_amount.value) : 0;\n    const discount = data.discount_amount && data.discount_amount.value !== null ? parseFloat(data.discount_amount.value) : 0;\n    \n    if (!isNaN(subtotal) && !isNaN(total)) {\n      const expectedTotal = subtotal + tax - discount;\n      const diff = Math.abs(expectedTotal - total);\n      if (diff > 0.02) {\n        item.json.mathDiscrepancies.push(`Calculated total (${expectedTotal.toFixed(2)}) ≠ stated total (${total.toFixed(2)})`);\n        item.json.flags.push(\"TOTAL_MISMATCH\");\n      }\n    }\n  }\n}\n\nreturn item;"
       },
-      "id": "prepare-failed-extraction-row-id",
-      "name": "Prepare Failed Extraction Row",
+      "id": "validate-math-id",
+      "name": "validateMath",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1450,
-        340
+        2000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item;\nitem.json.flags = item.json.flags || [];\n\nif (item.json.success && item.json.extracted_json) {\n  const data = item.json.extracted_json;\n\n  // Required fields check\n  const required = {\n    \"invoice_number\": data.invoice_number?.value,\n    \"invoice_date\": data.invoice_date?.value,\n    \"total\": data.total?.value,\n    \"vendor.name\": data.vendor?.name?.value\n  };\n\n  for (const [key, val] of Object.entries(required)) {\n    if (val === null || val === undefined) {\n      const flagName = `MISSING_${key.toUpperCase().replace('.', '_')}`;\n      item.json.flags.push(flagName);\n    }\n  }\n\n  // Date format check\n  const dateRegex = /^\\d{4}-\\d{2}-\\d{2}$/;\n  if (data.invoice_date?.value && !dateRegex.test(data.invoice_date.value)) {\n    item.json.flags.push(\"INVALID_DATE_FORMAT_INVOICE_DATE\");\n  }\n  if (data.due_date?.value && !dateRegex.test(data.due_date.value)) {\n    item.json.flags.push(\"INVALID_DATE_FORMAT_DUE_DATE\");\n  }\n\n  // Negative values check\n  if (data.total?.value !== null && data.total?.value !== undefined) {\n    const totalVal = parseFloat(data.total.value);\n    if (!isNaN(totalVal) && totalVal < 0) {\n      item.json.flags.push(\"NEGATIVE_TOTAL\");\n    }\n  }\n} else {\n  // Fail path / Unsupported file / Extraction failed\n  item.json.flags.push(\"MISSING_INVOICE_NUMBER\");\n  item.json.flags.push(\"MISSING_INVOICE_DATE\");\n  item.json.flags.push(\"MISSING_TOTAL\");\n  item.json.flags.push(\"MISSING_VENDOR_NAME\");\n}\n\nreturn item;"
+      },
+      "id": "validate-fields-id",
+      "name": "validateFields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item;\nitem.json.lowConfidenceFields = [];\nitem.json.avgConfidence = 0;\n\nif (item.json.success && item.json.extracted_json) {\n  const data = item.json.extracted_json;\n  const scores = [];\n  const lowFields = [];\n\n  function traverse(obj, path = \"\") {\n    if (!obj || typeof obj !== \"object\") return;\n\n    if (\"value\" in obj && \"confidence\" in obj) {\n      if (obj.value !== null && obj.value !== undefined) {\n        const conf = parseInt(obj.confidence, 10);\n        if (!isNaN(conf)) {\n          scores.push(conf);\n          if (conf < 75) {\n            lowFields.push({\n              field: path,\n              confidence: conf,\n              value: obj.value\n            });\n          }\n        }\n      }\n      return;\n    }\n\n    if (Array.isArray(obj)) {\n      obj.forEach((val, idx) => {\n        traverse(val, `${path}[${idx}]`);\n      });\n    } else {\n      for (const [key, val] of Object.entries(obj)) {\n        const nextPath = path ? `${path}.${key}` : key;\n        traverse(val, nextPath);\n      }\n    }\n  }\n\n  traverse(data);\n\n  if (scores.length > 0) {\n    const sum = scores.reduce((a, b) => a + b, 0);\n    item.json.avgConfidence = Math.round(sum / scores.length);\n  } else {\n    item.json.avgConfidence = 0;\n  }\n  item.json.lowConfidenceFields = lowFields;\n} else {\n  item.json.avgConfidence = 0;\n  item.json.lowConfidenceFields = [];\n}\n\nreturn item;"
+      },
+      "id": "classify-confidence-id",
+      "name": "classifyConfidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item;\n\nconst mathDiscrepancies = item.json.mathDiscrepancies || [];\nconst flags = item.json.flags || [];\nconst avgConfidence = item.json.avgConfidence ?? 0;\nconst lowConfidenceFields = item.json.lowConfidenceFields || [];\n\nlet status = \"AUTO_APPROVED\";\nlet statusColor = \"#34A853\"; // Green\n\nif (\n  mathDiscrepancies.length > 0 ||\n  flags.includes(\"MISSING_INVOICE_NUMBER\") ||\n  flags.includes(\"MISSING_TOTAL\")\n) {\n  status = \"REVIEW_REQUIRED\";\n  statusColor = \"#EA4335\"; // Red\n} else if (\n  avgConfidence < 75 ||\n  lowConfidenceFields.length > 2\n) {\n  status = \"REVIEW_RECOMMENDED\";\n  statusColor = \"#FBBC04\"; // Amber\n}\n\nitem.json.status = status;\nitem.json.statusColor = statusColor;\n\nreturn item;"
+      },
+      "id": "determine-status-id",
+      "name": "determineStatus",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        100
       ]
     },
     {
@@ -283,7 +311,13 @@
             "Tax Amount": "={{ $json.extracted_data?.tax_amount }}",
             "Total": "={{ $json.extracted_data?.total }}",
             "Currency": "={{ $json.extracted_data?.currency }}",
-            "Raw Response": "={{ $json.extracted_data?.raw_response }}"
+            "Raw Response": "={{ $json.extracted_data?.raw_response || ($json.fileType === 'unknown' ? 'UNSUPPORTED_FILE_TYPE' : 'EXTRACTION_FAILED') }}",
+            "Status": "={{ $json.status }}",
+            "Status Color": "={{ $json.statusColor }}",
+            "Avg Confidence": "={{ $json.avgConfidence }}",
+            "Low Confidence Fields": "={{ $json.lowConfidenceFields && $json.lowConfidenceFields.length > 0 ? $json.lowConfidenceFields.map(f => f.field + ' (' + f.confidence + '%)').join(', ') : 'None' }}",
+            "Math Discrepancies": "={{ $json.mathDiscrepancies && $json.mathDiscrepancies.length > 0 ? $json.mathDiscrepancies.join(', ') : 'None' }}",
+            "Flags": "={{ $json.flags && $json.flags.length > 0 ? $json.flags.join(', ') : 'None' }}"
           }
         },
         "options": {}
@@ -293,7 +327,7 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
       "position": [
-        2100,
+        2850,
         220
       ],
       "credentials": {
@@ -345,7 +379,7 @@
         ],
         [
           {
-            "node": "Prepare Failed Extraction Row",
+            "node": "validateFields",
             "type": "main",
             "index": 0
           }
@@ -367,7 +401,7 @@
       "main": [
         [
           {
-            "node": "Set Text Path Meta",
+            "node": "Prepare Claude Multimodal Payload",
             "type": "main",
             "index": 0
           }
@@ -375,17 +409,6 @@
         [
           {
             "node": "Convert PDF to Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Set Text Path Meta": {
-      "main": [
-        [
-          {
-            "node": "Prepare Claude Multimodal Payload",
             "type": "main",
             "index": 0
           }
@@ -440,14 +463,47 @@
       "main": [
         [
           {
-            "node": "Google Sheets Append",
+            "node": "validateMath",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Failed Extraction Row": {
+    "validateMath": {
+      "main": [
+        [
+          {
+            "node": "validateFields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validateFields": {
+      "main": [
+        [
+          {
+            "node": "classifyConfidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "classifyConfidence": {
+      "main": [
+        [
+          {
+            "node": "determineStatus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "determineStatus": {
       "main": [
         [
           {
