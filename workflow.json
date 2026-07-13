@@ -1,5 +1,5 @@
 {
-  "name": "AI Invoice Data Extractor - Phase 03",
+  "name": "AI Invoice Data Extractor - Phase 04",
   "nodes": [
     {
       "parameters": {
@@ -34,16 +34,37 @@
     },
     {
       "parameters": {
+        "watchType": "folder",
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_INCOMING_FOLDER_ID_HERE",
+          "mode": "id"
+        },
+        "options": {
+          "downloadFile": true
+        }
+      },
+      "id": "google-drive-trigger-id",
+      "name": "Google Drive Trigger",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        380
+      ]
+    },
+    {
+      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const binaryKeys = Object.keys(item.binary || {});\n  if (binaryKeys.length === 0) {\n    item.json.fileType = 'unknown';\n    item.json.has_attachment = false;\n    continue;\n  }\n  item.json.has_attachment = true;\n  \n  const attachmentKey = binaryKeys.find(k => {\n    const mime = (item.binary[k].mimeType || '').toLowerCase();\n    const name = (item.binary[k].fileName || '').toLowerCase();\n    return mime.includes('pdf') || mime.includes('jpeg') || mime.includes('jpg') || mime.includes('png') ||\n           name.endsWith('.pdf') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png');\n  }) || binaryKeys[0];\n\n  item.json.attachment_key = attachmentKey;\n  item.json.pdf_filename = item.binary[attachmentKey].fileName;\n  item.json.pdf_mime_type = item.binary[attachmentKey].mimeType;\n\n  try {\n    const buffer = await this.helpers.getBinaryDataBuffer(i, attachmentKey);\n    if (buffer && buffer.length >= 4) {\n      const magic = buffer.readUInt32BE(0);\n      if (magic === 0x25504446) {\n        item.json.fileType = 'pdf';\n      } else if (magic === 0x89504E47) {\n        item.json.fileType = 'png';\n      } else if ((magic >> 8) === 0xFFD8FF || magic === 0xFFD8FFE0 || magic === 0xFFD8FFE1) {\n        item.json.fileType = 'jpeg';\n      } else {\n        const mime = (item.binary[attachmentKey].mimeType || '').toLowerCase();\n        if (mime.includes('pdf')) {\n          item.json.fileType = 'pdf';\n        } else if (mime.includes('jpeg') || mime.includes('jpg')) {\n          item.json.fileType = 'jpeg';\n        } else if (mime.includes('png')) {\n          item.json.fileType = 'png';\n        } else {\n          item.json.fileType = 'unknown';\n        }\n      }\n    } else {\n      item.json.fileType = 'unknown';\n    }\n  } catch (e) {\n    item.json.fileType = 'unknown';\n    item.json.detection_error = e.message;\n  }\n\n  let email = null;\n  if (item.json.from) {\n    if (typeof item.json.from === 'string') {\n      const match = item.json.from.match(/<([^>]+)>/);\n      email = match ? match[1] : item.json.from;\n    } else if (item.json.from.value && item.json.from.value[0]) {\n      email = item.json.from.value[0].address;\n    } else if (item.json.from.text) {\n      const match = item.json.from.text.match(/<([^>]+)>/);\n      email = match ? match[1] : item.json.from.text;\n    }\n  }\n  item.json.sender_email = email || 'unknown@example.com';\n  \n  item.binary = {\n    attachment: item.binary[attachmentKey]\n  };\n}\nreturn items;"
+        "jsCode": "const items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const binaryKeys = Object.keys(item.binary || {});\n  \n  // Check if originated from Drive (has fileId) vs Gmail (has attachment)\n  item.json.origin = item.json.id && !item.json.messageId ? 'drive' : 'gmail';\n  item.json.drive_file_id = item.json.id || null;\n\n  if (binaryKeys.length === 0) {\n    item.json.fileType = 'unknown';\n    item.json.has_attachment = false;\n    continue;\n  }\n  item.json.has_attachment = true;\n  \n  const attachmentKey = binaryKeys.find(k => {\n    const mime = (item.binary[k].mimeType || '').toLowerCase();\n    const name = (item.binary[k].fileName || '').toLowerCase();\n    return mime.includes('pdf') || mime.includes('jpeg') || mime.includes('jpg') || mime.includes('png') ||\n           name.endsWith('.pdf') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png');\n  }) || binaryKeys[0];\n\n  item.json.attachment_key = attachmentKey;\n  item.json.pdf_filename = item.binary[attachmentKey].fileName;\n  item.json.pdf_mime_type = item.binary[attachmentKey].mimeType;\n\n  try {\n    const buffer = await this.helpers.getBinaryDataBuffer(i, attachmentKey);\n    if (buffer && buffer.length >= 4) {\n      const magic = buffer.readUInt32BE(0);\n      if (magic === 0x25504446) {\n        item.json.fileType = 'pdf';\n      } else if (magic === 0x89504E47) {\n        item.json.fileType = 'png';\n      } else if ((magic >> 8) === 0xFFD8FF || magic === 0xFFD8FFE0 || magic === 0xFFD8FFE1) {\n        item.json.fileType = 'jpeg';\n      } else {\n        const mime = (item.binary[attachmentKey].mimeType || '').toLowerCase();\n        if (mime.includes('pdf')) {\n          item.json.fileType = 'pdf';\n        } else if (mime.includes('jpeg') || mime.includes('jpg')) {\n          item.json.fileType = 'jpeg';\n        } else if (mime.includes('png')) {\n          item.json.fileType = 'png';\n        } else {\n          item.json.fileType = 'unknown';\n        }\n      }\n    } else {\n      item.json.fileType = 'unknown';\n    }\n  } catch (e) {\n    item.json.fileType = 'unknown';\n    item.json.detection_error = e.message;\n  }\n\n  let email = null;\n  if (item.json.from) {\n    if (typeof item.json.from === 'string') {\n      const match = item.json.from.match(/<([^>]+)>/);\n      email = match ? match[1] : item.json.from;\n    } else if (item.json.from.value && item.json.from.value[0]) {\n      email = item.json.from.value[0].address;\n    } else if (item.json.from.text) {\n      const match = item.json.from.text.match(/<([^>]+)>/);\n      email = match ? match[1] : item.json.from.text;\n    }\n  }\n  item.json.sender_email = email || 'drive-system@example.com';\n  \n  item.binary = {\n    attachment: item.binary[attachmentKey]\n  };\n}\nreturn items;"
       },
       "id": "detect-file-type-id",
       "name": "detectFileType",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        200,
-        240
+        220,
+        300
       ]
     },
     {
@@ -73,8 +94,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
       "position": [
-        400,
-        240
+        420,
+        300
       ]
     },
     {
@@ -87,8 +108,8 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        600,
-        100
+        620,
+        140
       ],
       "settings": {
         "onError": "continueRegularOutput"
@@ -111,8 +132,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        800,
-        100
+        820,
+        140
       ]
     },
     {
@@ -129,8 +150,8 @@
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1,
       "position": [
-        1000,
-        180
+        1020,
+        220
       ]
     },
     {
@@ -143,8 +164,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
-        180
+        1220,
+        220
       ]
     },
     {
@@ -157,8 +178,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1400,
-        100
+        1420,
+        140
       ]
     },
     {
@@ -198,8 +219,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1600,
-        100
+        1620,
+        140
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -221,8 +242,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1800,
-        100
+        1820,
+        140
       ]
     },
     {
@@ -235,8 +256,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2000,
-        100
+        2020,
+        140
       ]
     },
     {
@@ -249,8 +270,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
-        100
+        2220,
+        140
       ]
     },
     {
@@ -263,8 +284,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2400,
-        100
+        2420,
+        140
       ]
     },
     {
@@ -277,8 +298,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2600,
-        100
+        2620,
+        140
       ]
     },
     {
@@ -327,14 +348,236 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
       "position": [
-        2850,
-        220
+        2820,
+        240
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-oauth2-credential-id",
           "name": "Google Sheets"
         }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('determineStatus').item.json.status }}",
+              "value2": "AUTO_APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "if-auto-approved-id",
+      "name": "IF Auto-Approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3020,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "stakeholder@example.com",
+        "subject": "={{ '✅ Invoice processed — ' + ($('determineStatus').item.json.extracted_data?.vendor_name || 'Unknown') + ' · ' + ($('determineStatus').item.json.extracted_data?.currency || '$') + ($('determineStatus').item.json.extracted_data?.total || '0.00') }}",
+        "html": "={{ 'Invoice #' + ($('determineStatus').item.json.extracted_data?.invoice_number || 'N/A') + ' from ' + ($('determineStatus').item.json.extracted_data?.vendor_name || 'Unknown') + ' has been automatically extracted and approved.<br><br><b>Total:</b> ' + ($('determineStatus').item.json.extracted_data?.currency || '$') + ($('determineStatus').item.json.extracted_data?.total || '0.00') + '<br><b>Due Date:</b> ' + ($('determineStatus').item.json.extracted_data?.due_date || 'N/A') + '<br><br><a href=\"https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit\">View in Google Sheets</a>' }}"
+      },
+      "id": "success-notification-id",
+      "name": "Success Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        3220,
+        140
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth2-id",
+          "name": "Gmail"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "stakeholder@example.com",
+        "subject": "={{ '⚠️ Invoice needs review — ' + ($('determineStatus').item.json.extracted_data?.vendor_name || 'Unknown') + ' · ' + ($('determineStatus').item.json.extracted_data?.currency || '$') + ($('determineStatus').item.json.extracted_data?.total || '0.00') }}",
+        "html": "={{ 'Invoice #' + ($('determineStatus').item.json.extracted_data?.invoice_number || 'N/A') + ' from ' + ($('determineStatus').item.json.extracted_data?.vendor_name || 'Unknown') + ' requires your attention.<br><br><b>Status:</b> <span style=\"color:' + ($('determineStatus').item.json.statusColor || '#EA4335') + ';font-weight:bold;\">' + $('determineStatus').item.json.status + '</span><br><br><b>Issues Found:</b><br>- Math Discrepancies: ' + ($('determineStatus').item.json.mathDiscrepancies && $('determineStatus').item.json.mathDiscrepancies.length > 0 ? $('determineStatus').item.json.mathDiscrepancies.join(', ') : 'None') + '<br>- Low Confidence Fields: ' + ($('determineStatus').item.json.lowConfidenceFields && $('determineStatus').item.json.lowConfidenceFields.length > 0 ? $('determineStatus').item.json.lowConfidenceFields.map(f => f.field + ' (' + f.confidence + '%)').join(', ') : 'None') + '<br>- Flags: ' + ($('determineStatus').item.json.flags && $('determineStatus').item.json.flags.length > 0 ? $('determineStatus').item.json.flags.join(', ') : 'None') + '<br><br><a href=\"https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit\">Review in Google Sheets</a>' }}"
+      },
+      "id": "review-notification-id",
+      "name": "Review Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        3220,
+        340
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth2-id",
+          "name": "Gmail"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "q": "={{ \"name = '\" + new Date().toISOString().substring(0, 7) + \"' and mimeType = 'application/vnd.google-apps.folder' and 'YOUR_PROCESSED_PARENT_FOLDER_ID_HERE' in parents and trashed = false\" }}"
+      },
+      "id": "search-folder-id",
+      "name": "Search Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3450,
+        500
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-oauth2-id",
+          "name": "Google Drive"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.id }}",
+              "operation": "notEmpty"
+            }
+          ]
+        }
+      },
+      "id": "if-folder-exists-id",
+      "name": "IF Folder Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3650,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ new Date().toISOString().substring(0, 7) }}",
+        "parents": [
+          "YOUR_PROCESSED_PARENT_FOLDER_ID_HERE"
+        ]
+      },
+      "id": "create-folder-id",
+      "name": "Create Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3850,
+        600
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-oauth2-id",
+          "name": "Google Drive"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByIndex"
+      },
+      "id": "merge-folder-id-id",
+      "name": "Merge Folder ID",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        4100,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('detectFileType').item.json.origin }}",
+              "value2": "gmail"
+            }
+          ]
+        }
+      },
+      "id": "if-gmail-vs-drive-id",
+      "name": "IF Gmail vs Drive",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        4300,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "fileId": "={{ $('detectFileType').item.json.drive_file_id }}",
+        "parents": [
+          "={{ $json.id }}"
+        ]
+      },
+      "id": "move-file-id",
+      "name": "Move File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4520,
+        440
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-oauth2-id",
+          "name": "Google Drive"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "fileContent": "attachment",
+        "fileName": "={{ $('detectFileType').item.json.pdf_filename || 'invoice.pdf' }}",
+        "parents": [
+          "={{ $json.id }}"
+        ]
+      },
+      "id": "upload-attachment-id",
+      "name": "Upload Attachment",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4520,
+        240
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-oauth2-id",
+          "name": "Google Drive"
+        }
+      },
+      "settings": {
+        "onError": "continueRegularOutput"
       }
     }
   ],
@@ -350,11 +593,27 @@
         ]
       ]
     },
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "detectFileType",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "detectFileType": {
       "main": [
         [
           {
             "node": "Switch Routing",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Folder ID",
             "type": "main",
             "index": 0
           }
@@ -508,6 +767,119 @@
         [
           {
             "node": "Google Sheets Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Append": {
+      "main": [
+        [
+          {
+            "node": "IF Auto-Approved",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Auto-Approved": {
+      "main": [
+        [
+          {
+            "node": "Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Review Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Notification": {
+      "main": [
+        []
+      ]
+    },
+    "Review Notification": {
+      "main": [
+        []
+      ]
+    },
+    "Search Folder": {
+      "main": [
+        [
+          {
+            "node": "IF Folder Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Folder Exists": {
+      "main": [
+        [
+          {
+            "node": "Merge Folder ID",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Create Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Folder": {
+      "main": [
+        [
+          {
+            "node": "Merge Folder ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Folder ID": {
+      "main": [
+        [
+          {
+            "node": "IF Gmail vs Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Gmail vs Drive": {
+      "main": [
+        [
+          {
+            "node": "Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move File",
             "type": "main",
             "index": 0
           }
