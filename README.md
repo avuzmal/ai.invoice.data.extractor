@@ -1,13 +1,13 @@
-# 📑 OmniExtract: Enterprise AI Invoice Data Extractor
+# 🧾 OmniExtract: Enterprise AI Invoice Data Extractor
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x200/09090b/ffffff?text=OMNI+EXTRACT+HERO+GRAPHIC" alt="OmniExtract Hero Banner">
+  <img src="./assets/ui-screenshot.png" alt="OmniExtract Hero Banner"> <!-- TODO: Replace with actual running UI GIF -->
 </div>
 
 <div align="center">
   
 [![n8n v1.0+](https://img.shields.io/badge/n8n-v1.0%2B-FF6F61?style=for-the-badge&logo=n8n)](https://n8n.io)
-[![Claude 3.5 Sonnet](https://img.shields.io/badge/Model-Claude%203.5%20Sonnet-CD7F32?style=for-the-badge&logo=anthropic)](https://anthropic.com)
+[![Claude 3.7 Sonnet](https://img.shields.io/badge/Model-Claude%203.7%20Sonnet-CD7F32?style=for-the-badge&logo=anthropic)](https://anthropic.com)
 [![Google Sheets](https://img.shields.io/badge/Sheets-Enterprise-34A853?style=for-the-badge&logo=google-sheets)](https://google.com/sheets)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
